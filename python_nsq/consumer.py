@@ -29,7 +29,8 @@ class Consumer:
         self.pool_manager = urllib3.PoolManager() #http pool manager
         self.nslookupd_http_addresses = nslookupd_http_addresses  #[string] "http://192.168.1.11:4161/"
         self.nslookupd_http_addresses_mutex = threading.Lock()
-        self.nsqd_tcp_addresses = []    #[{"nslookupd_http_address": "http://", "nsqd_tcp_address": "a:b", "connected":  True}]
+        #[{"nslookupd_http_address": "http://", "nsqd_tcp_address": "a:b", "connected":  True}]
+        self.nsqd_tcp_addresses = []
         self.nsqd_tcp_addresses_mutex = threading.Lock()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
@@ -66,7 +67,12 @@ class Consumer:
             #update nsqd_tcp_addresses
             for i in range(0, len(nslookupd_http_addresses)): 
                 nslookupd_http_address = nslookupd_http_addresses[i]
-                response = self.pool_manager.request("GET", nslookupd_http_address + "nodes").data.decode("utf-8")
+                try:
+                    response = self.pool_manager.request("GET", nslookupd_http_address + "nodes").data.decode("utf-8")
+                except Exception:
+                    print("[consumer]: connect nslookupd failed")
+                    time.sleep(self.nslookupd_poll_interval)
+                    continue
                 nodes =  json.loads(response).get("producers","")
                 self.nsqd_tcp_addresses_mutex.acquire()
                 for j in range(0, len(nodes)):
@@ -175,7 +181,8 @@ class Consumer:
         attempts = convert.bytes_uint16(data[8:10])
         id = data[10:26]
         body = data[26:]
-        msg = message.Message(nsqd_tcp_address, timestamp, attempts, id, body, self._send, self.conn_deadline, local_address)
+        msg = message.Message(nsqd_tcp_address, timestamp, attempts, id, body, 
+            self._send, self.conn_deadline, local_address)
         control = Control(self.stop)#set Controller
         self.message_handler(control, msg)
         
