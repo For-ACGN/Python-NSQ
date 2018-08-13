@@ -8,10 +8,11 @@ import python_nsq
 def main():
     producer = python_nsq.Producer("127.0.0.1:4150")
     err = producer.publish("test_topic", b"acg")
-        if err != 0:
-            print("producer publish error")     
-        else:
-            print("producer publish successfully")
+    if err != 0:
+        print("producer publish error")     
+    else:
+        print("producer publish successfully")
+    producer.stop()
     
 if __name__ == "__main__":
     main()
