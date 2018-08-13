@@ -1,6 +1,6 @@
 # Python-NSQ
 Use Python-NSQ like go-nsq
-
+```
 Producer:
 import python_nsq
 
@@ -14,7 +14,7 @@ def main():
     
 if __name__ == "__main__":
     main()
-    
+---------------------------------------------------------
 Consumer:
 import python_nsq
 
@@ -35,3 +35,4 @@ def handler_message(control, message):
     
 if __name__ == "__main__":
     main()
+```
