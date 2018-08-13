@@ -18,6 +18,7 @@ if __name__ == "__main__":
 ```
 Consumer:
 ```
+import time
 import python_nsq
 
 def main():
