@@ -27,12 +27,10 @@ def main():
 
 def handler_message(control, message):
     #control.stop() #control the consumer
-    print("[message]")
     print("nsqd_address:", message.nsqd_address)
     print("timestamp:   ", message.timestamp)
     print("id:          ", message.id)
     print("message:     ", message.body)
-    print(" ")
     message.finish()
     
 if __name__ == "__main__":
