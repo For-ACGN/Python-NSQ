@@ -10,10 +10,11 @@ class Channel:
         if not self.data:
             self.cond.wait()
         data = self.data
+        self.data = None
         self.cond.notify()
         self.cond.release()
         return data
-    
+
     def write(self, data):
         self.cond.acquire()
         if self.data:
@@ -21,8 +22,8 @@ class Channel:
         self.data = data
         self.cond.notify()
         self.cond.release()
-        
-    def clear(self):
+
+    def close(self):
         self.cond.acquire()
         self.data = None
         self.cond.notifyAll()

@@ -3,7 +3,6 @@ import re
 from .convert import bytes_int32
 
 #client types
-MAGIC_V1 = b"  V1" #
 MAGIC_V2 = b"  V2"
 
 #message
@@ -20,8 +19,8 @@ VALID_NAME_REGEX = re.compile(r"^[\.a-zA-Z0-9_-]+(#ephemeral)?$")
 
 #check a topic or channel name for correctness
 def check_name(name):
-    assert isinstance(name,str) , "name is not string"
-    if  len(str) > 64 or len(str) < 1:
+    assert isinstance(name, str) , "name is not string"
+    if  len(name) > 64 or len(name) < 1:
         return False
     return VALID_NAME_REGEX.match(name)
 

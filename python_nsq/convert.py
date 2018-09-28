@@ -13,7 +13,7 @@ def int16_bytes(int16):
 
 def uint16_bytes(uint16):
     return _uint16.pack(uint16)
-    
+
 def int32_bytes(int32):
     return _int32.pack(int32)
 
@@ -36,7 +36,7 @@ def bytes_uint16(bytes):
     if len(bytes) != 2:
         raise Exception("bytes length is not 2")
     return _uint16.unpack(bytes)[0]
-    
+
 def bytes_int32(bytes):
     if len(bytes) != 4:
         raise Exception("bytes length is not 4")
@@ -57,9 +57,16 @@ def bytes_uint64(bytes):
         raise Exception("bytes length is not 8")
     return _uint64.unpack(bytes)[0]
 
-def string_bytes(string, charset='utf-8', errors='strict'):
+def string_bytes(string, charset="utf-8", errors="strict"):
     if isinstance(string, bytes):
         return string
     if isinstance(string, str):
         return string.encode(charset, errors)
-    raise TypeError('expected bytes or a string, not %r' % type(string))
+    raise TypeError("expected bytes or a string, not %r" % type(string))
+
+def bytes_string(b, charset='utf-8'):
+    if isinstance(b, str):
+        return b
+    if isinstance(b, bytes):
+        return str(b, encoding=charset)
+    raise TypeError("expected bytes or a string, not %r" % type(b))

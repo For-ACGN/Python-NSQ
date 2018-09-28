@@ -3,175 +3,171 @@ import threading
 from python_nsq import connnection
 from python_nsq import command
 from python_nsq import protocol
+
+from .config import Config
 from .channel import Channel
 from .convert import int32_bytes
 from .convert import uint32_bytes
-from .version import VERSION
+from .convert import bytes_string
 
 class Producer:
-    def __init__(self,nsqd_tcp_address):
+    def __init__(self, nsqd_tcp_address, config):
         assert isinstance(nsqd_tcp_address, str) , "nsqd_tcp_address is not string"
+        assert isinstance(config, Config) , "config is not config.Config"
+        self.nsqd_tcp_address = nsqd_tcp_address
+        self.config = config
         addr = nsqd_tcp_address.split(":")
-        self.conn_addr = (addr[0], int(addr[1]))
-        self.conn_deadline = 60 # send
-        self.conn_buffer_size = 1024
-        self.conn = connnection.Conn(self.conn_addr, self.conn_buffer_size, self._router, self._conn_close)
-        self.status = 0 #0=disconnect 1=connect
-        self.status_lock = threading.Lock()
+        self.conn = connnection.Conn((addr[0], int(addr[1])), self.config, self._router, self._conn_close)
         self.response = Channel()
-        self.send_lock = threading.Lock()
+        self.status = 0 #0=disconnect 1=connect
+        self.status_mutex = threading.Lock()
+        self.publish_mutex = threading.Lock()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if (isinstance(exc_val, Exception)):
             pass # 报错
         self.stop()
 
-    def _get_status(self):
-        self.status_lock.acquire()
-        status = self.status
-        self.status_lock.release()
-        return status
-        
-    def _set_status(self, status):
-        self.status_lock.acquire()
-        self.status = status
-        self.status_lock.release()
+    def _check_connection(self):
+        self.status_mutex.acquire()
+        if not self.status:
+            err = self.conn.connect()
+            if err != "":
+                self.status_mutex.release()
+                return err
+            self.status = 1
+        self.status_mutex.release()    
+        return ""
 
-    def _connect(self): #needn't lock
-        err = self.conn.connect()
-        if err != "":
-            print(err)
-            return False
-        self.conn.send(protocol.MAGIC_V2, self.conn_deadline)
-        #test identify_data
-        identify_data = {
-            'client_id': self.conn.local_address,
-            'hostname': connnection.get_hostname(),
-            'heartbeat_interval': 5000,
-            'feature_negotiation': True,
-            'tls_v1': False,
-            'snappy': False,
-            'deflate': False,
-            'deflate_level': 6,
-            'output_buffer_timeout': 1000,
-            'output_buffer_size': 16384,
-            'sample_rate': 0,
-            'user_agent': "Python-NSQ/" + VERSION,
-            'msg_timeout': 0,
-            }
-        self.conn.send(command.identify(identify_data), self.conn_deadline)
-        self.status = 1
-        return True
- 
-    #local_address is not used -> Connection.py 
-    def _router(self, message, local_address): 
-        response = protocol.resolve_response(message)
+    def _router(self, raw):
+        response = protocol.resolve_response(raw)
         frame_type = response[0]
         data = response[1]
         if frame_type == protocol.FRAME_TYPE_RESPONSE:
-            self._handler_response(data)
+            self._on_response(data)
         elif frame_type == protocol.FRAME_TYPE_ERROR:
-            self._handler_error(data)
+            self._on_error(data)
+        elif frame_type == protocol.FRAME_TYPE_MESSAGE:
+            pass
         else:
-            print("[producer]: invaild frame type")
+            self._log("ERROR", "invaild frame type")
 
-    def _conn_close(self, local_address, remote_address):
-        self._set_status(0)
-        self.response.clear()
-        print("[producer]: connection " + local_address + " -> " + remote_address + " closed")
-    
-    def _handler_response(self, response):
+    def _conn_close(self):
+        self.status_mutex.acquire()
+        self.status = 0
+        self.response.close()
+        self.status_mutex.release()
+        local = self.conn.local_address
+        remote = self.conn.remote_address[0] + ":" + str(self.conn.remote_address[1])
+        self._log("ERROR", " tcp connection " + local + " -> " + remote + " closed")
+
+    def _on_response(self, response):
         if response == b"OK":
             self._handler_response_ok()
         elif response == b"_heartbeat_":
             self._handler_response_heartbeat()
-        elif response[:2] == b"{\"":
-            print("[producer]: login successfully")
         else:
-            print("[producer]: invaild response")
-    
+            self._log("ERROR", "invaild response")
+
     def _handler_response_ok(self):
         self.response.write("ok")
-        
+
     def _handler_response_heartbeat(self):
-        self.send_lock.acquire()
-        if not self.conn.send(command.nop(), self.conn_deadline):
-            self.send_lock.release()
-            print("[producer]: send heartbeat response error")
+        err = self.conn.send(command.nop())
+        if err != "":
+            self._log("ERROR", "send heartbeat response error")
             return
-        self.send_lock.release()
-        print("[producer]: send heartbeat response")
+        self._log("DEBUG", "send heartbeat response successfully")
 
-    def _handler_error(self, error):
-        self.response.write(error)
-        print("[producer]: error: ", error)
+    def _on_error(self, err):
+        self.response.write(bytes_string(err))
 
-    def stop(self):
-        self.conn.close()
-        self._set_status(0)
-        self.response.clear()
-        print("[producer] stop")
-        
+    def _log(self, level, message):#TODO
+        print("[Python-NSQ] " + level + " Producer " + self.config.client_id + " " + message)
+
     def publish(self, topic, message):
         assert isinstance(topic, str), "topic is not string"
         if not isinstance(message, bytes):
             assert isinstance(message, str), "message is not string or bytes"
-        self.send_lock.acquire()
-        if not self._get_status():
-            if not self._connect():
-                self.send_lock.release()
-                return 1 #connect error
-        if not self.conn.send(command.publish(topic, message), self.conn_deadline):
-            self._set_status(0)
-            self.send_lock.release()
-            return 2    #send error
-        if self.response.read() != "ok":
-            self.send_lock.release()
-            return 3 #receive ok error
-        self.send_lock.release()
-        return 0
+        if len(message) == 0:
+            return "message size is 0"
+        self.publish_mutex.acquire()
+        err = self._check_connection()
+        if err != "":
+            self.publish_mutex.release()
+            return err
+        err =  self.conn.send(command.publish(topic, message))
+        if err != "":
+            self.publish_mutex.release()
+            return err    #send error
+        response = self.response.read()
+        if response == "":
+            self.publish_mutex.release()
+            return "connection has been closed"
+        elif response != "ok": #response = error
+            self.publish_mutex.release()
+            return response 
+        self.publish_mutex.release()
+        return ""
 
     def multi_publish(self, topic, message):
         assert isinstance(topic, str), "topic is not string"
         assert isinstance(message, list), "message is not list"
-        self.send_lock.acquire()
-        if not self.status:
-            if not self._connect():
-                self.send_lock.release()
-                return 1 #connect error
-        #pack message
-        package = b""
+        self.publish_mutex.acquire()
+        err = self._check_connection()
+        if err != "":
+            self.publish_mutex.release()
+            return err
+        package = b"" #pack message
         package += uint32_bytes(len(message))
         for i in range(0, len(message)):
             if not isinstance(message[i], bytes):
                 assert isinstance(message[i], str), "message is not string or bytes"
-            package += int32_bytes(len(message[i])) + message[i]   
-        if not self.conn.send(command.multi_publish(topic, package), self.conn_deadline):
-            self._set_status(0)
-            self.send_lock.release()
-            return 2    #send error
-        if self.response.read() != "ok":
-            self.send_lock.release()
-            return 3 #receive ok error
-        self.send_lock.release()
-        return 0
+            package += int32_bytes(len(message[i])) + message[i]
+        err = self.conn.send(command.multi_publish(topic, package))
+        if err != "":
+            self.publish_mutex.release()
+            return err    #send error
+        response = self.response.read()
+        if response == "":
+            self.publish_mutex.release()
+            return "connection has been closed"
+        elif response != "ok": #response = error
+            self.publish_mutex.release()
+            return response 
+        self.publish_mutex.release()
+        return ""
 
     def deferred_publish(self, topic, message, delay): #ms
         assert isinstance(topic, str), "topic is not string"
         if not isinstance(message, bytes):
             assert isinstance(message, str), "message is not string or bytes"
         assert isinstance(delay, int), "delay is not int"
-        self.send_lock.acquire()
-        if not self.status:
-            if not self._connect():
-                self.send_lock.release()
-                return 1 #connect error
-        if not self.conn.send(command.deferred_publish(topic, message, delay), self.conn_deadline):  
-            self._set_status(0)
-            self.send_lock.release()
-            return 2    #send error
-        if self.response.read() != "ok":
-            self.send_lock.release()
-            return 3 #receive ok error
-        self.send_lock.release()
-        return 0
+        self.publish_mutex.acquire()
+        err = self._check_connection()
+        if err != "":
+            self.publish_mutex.release()
+            return err
+        err =  self.conn.send(command.deferred_publish(topic, message, delay))
+        if err != "":
+            self.publish_mutex.release()
+            return err    #send error
+        response = self.response.read()
+        if response == "":
+            self.publish_mutex.release()
+            return "connection has been closed"
+        elif response != "ok": #response = error
+            self.publish_mutex.release()
+            return response 
+        self.publish_mutex.release()
+        return ""
+
+    def stop(self):
+        self.publish_mutex.acquire()
+        self.status_mutex.acquire()
+        self.status = 0
+        self.status_mutex.release()
+        self.conn.close()
+        self.response.close()
+        self.publish_mutex.release()
+        self._log("INFO", "stopped")
