@@ -5,7 +5,7 @@ def main():
     config.lookupd_poll_interval = 15 #default 60s
     consumer = python_nsq.Consumer("test_topic", "test_channel", handler_message, config)
     consumer.connect_nsqlookupds(["http://192.168.1.11:4161/"])
-    err = consumer.start() #
+    err = consumer.start()
     if err != "":
         print(err)
     #consumer.stop()

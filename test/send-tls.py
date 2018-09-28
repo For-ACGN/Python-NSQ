@@ -5,7 +5,7 @@ def main():
     print("[Python-NSQ] version:", python_nsq.version)
     config = python_nsq.Config()
     config.tls_v1 = True
-    config.tls_config.ca_certs = "ca.crt"   
+    config.tls_config.ca_certs = "ca.crt"
     config.auth_secret = "python_nsq"
     producer = python_nsq.Producer("192.168.1.11:4150", config)
     producer2 = python_nsq.Producer("192.168.1.11:4153", config)
