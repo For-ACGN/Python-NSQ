@@ -2,41 +2,44 @@
 Use Python-NSQ like go-nsq
 
 Producer:
-```
+```python
 import python_nsq
 
 def main():
-    producer = python_nsq.Producer("127.0.0.1:4150")
-    err = producer.publish("test_topic", b"acg")
-    if err != 0:
-        print("producer publish error")     
-    else:
-        print("producer publish successfully")
+    config = python_nsq.Config()
+    producer = python_nsq.Producer("192.168.1.11:4150", config)
+    err = producer.publish("test_topic", b"message")
+    if err != "":
+            print(err)
     producer.stop()
-    
+
 if __name__ == "__main__":
     main()
 ```
 Consumer:
-```
-import time
+```python
 import python_nsq
 
 def main():
-    consumer = python_nsq.Consumer("test_topic", "acg", handler_message, ["http://127.0.0.1:4161/"], 15)
-    consumer.start()
-    while True:
-        time.sleep(1000)
-    consumer.stop()
+    config = python_nsq.Config()
+    config.lookupd_poll_interval = 15 #default 60s
+    consumer = python_nsq.Consumer("test_topic", "test_channel", handler_message, config)
+    consumer.connect_nsqlookupds(["http://192.168.1.11:4161/"])
+    err = consumer.start()
+    if err != "":
+        print(err)
+    #consumer.stop()
 
 def handler_message(control, message):
-    #control.stop() #control the consumer
-    print("nsqd_address:", message.nsqd_address)
-    print("timestamp:   ", message.timestamp)
-    print("id:          ", message.id)
-    print("message:     ", message.body)
+    #control.stop() #control the consumer = consumer.stop()
+    content = "[message]\n"
+    content += "nsqd_address: " + message.nsqd_address + "\n"
+    content += "timestamp:    " + str(message.timestamp) + "\n"
+    content += "id:           " + str(message.id) + "\n"
+    content += "message:      " + str(message.body) + "\n "
+    print(content)
     message.finish()
-    
+
 if __name__ == "__main__":
     main()
 ```
