@@ -11,7 +11,6 @@ class Message:
 
     def finish(self):
         self._send(command.finish(self.id))
-        #self._send(command.ready(1))
 
     def requeue(self, delay): #ms
         self._send(command.requeue(self.id, delay))

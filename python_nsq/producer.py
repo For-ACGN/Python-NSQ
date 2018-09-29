@@ -17,7 +17,7 @@ class Producer:
         self.nsqd_tcp_address = nsqd_tcp_address
         self.config = config
         addr = nsqd_tcp_address.split(":")
-        self.conn = connnection.Conn((addr[0], int(addr[1])), self.config, self._router, self._conn_close)
+        self.conn = connnection.Conn((addr[0], int(addr[1])), self.config, self._router, self._conn_close,self._log)
         self.response = Channel()
         self.status = 0 #0=disconnect 1=connect
         self.status_mutex = threading.Lock()

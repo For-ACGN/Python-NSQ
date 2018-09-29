@@ -14,7 +14,7 @@ from .convert import bytes_int32
 from .convert import bytes_string
 
 class Conn:
-    def __init__(self, remote_address, config, handler_message, handler_close):
+    def __init__(self, remote_address, config, handler_message, handler_close, log):
         self.remote_address = remote_address
         self.config = config
         self.local_address = ""
@@ -24,6 +24,7 @@ class Conn:
         self.write_timeout = config.write_timeout
         self.handler_message = handler_message
         self.handler_close = handler_close
+        self.log = log
         self.conn = None
         self.status = 0  #0=closed 1=connected
         self.status_mutex = threading.Lock()
@@ -44,21 +45,18 @@ class Conn:
         err = self._identify()
         if err != "":
             return err
-        print("[Python-NSQ] INFO login successfully")
+        self.log("INFO", "Login successfully")
         self.receive_loop()
         return ""
 
     def close(self):
         self.status_mutex.acquire()
-        status = self.status
-        self.status_mutex.release()
-        if status == 1:
+        if self.status == 1:
             self.conn.shutdown(2) #close all
             self.conn.close()
-            self.status_mutex.acquire()
             self.status = 0
-            self.status_mutex.release()
             self.handler_close()
+        self.status_mutex.release()
 
     def _connect(self): #new socket
         try:
@@ -71,7 +69,7 @@ class Conn:
             self.status = 1
             self.status_mutex.release()
         except Exception:
-            return traceback.format_exc()#limit=1
+            return "\n" + traceback.format_exc(limit=1)
         return ""
 
     def _identify(self):
@@ -92,8 +90,8 @@ class Conn:
             pass
         else:
             return "invaild frame type"
-        identify_response = json.loads(data) 
-        print("[Python-NSQ] INFO Identify", identify_response)
+        identify_response = json.loads(data)
+        self.log("DEBUG", "Identify: " + str(identify_response))
         if identify_response["tls_v1"]:
             err = self._upgrade_tls()
             if err != "":
@@ -111,7 +109,7 @@ class Conn:
             tls_config.server_side, tls_config.cert_reqs, tls_config.ssl_version, tls_config.ca_certs, 
             tls_config.do_handshake_on_connect, tls_config.suppress_ragged_eofs, tls_config.ciphers)
         except Exception:
-            return "\n" + traceback.format_exc()#limit=1
+            return "\n" + traceback.format_exc(limit=1)
         return ""
 
     def _auth(self):
@@ -138,7 +136,7 @@ class Conn:
         else:
             return "invaild frame type"
         auth_response = json.loads(data)
-        print("[Python-NSQ] INFO Auth:", auth_response)
+        self.log("DEBUG", "Auth: " + str(auth_response))
         return ""
 
     def send(self, data):
@@ -149,12 +147,12 @@ class Conn:
         except Exception:
             self.close()
             self.send_mutex.release()
-            return traceback.format_exc()#limit=1
+            return "\n" + traceback.format_exc(limit=1)
         self.send_mutex.release()
         return ""
 
     def receive_loop(self): #start receive loop
-        print("[Python-NSQ] INFO start receive thread")
+        self.log("DEBUG", "Start receive thread")
         _thread.start_new_thread(self._receive, ())
 
     def _receive_message(self): #receive one message
@@ -165,7 +163,7 @@ class Conn:
             try:
                 buffer = self.conn.recv(self.buffer_size)
             except Exception:
-                traceback.print_exc()
+                traceback.print_exc(limit=1)
                 self.close()
                 break
             if len(buffer) == 0: # !!!!!!! No Exception
@@ -188,7 +186,7 @@ class Conn:
             try:
                 buffer = self.conn.recv(self.buffer_size)
             except Exception:
-                print(traceback.format_exc()) #limit=1
+                #print(traceback.format_exc(limit=1))
                 break
             if len(buffer) == 0:
                 break
@@ -202,4 +200,4 @@ class Conn:
                 self.handler_message(data[protocol.MESSAGE_SIZE:protocol.MESSAGE_SIZE + body_size])
                 data = data[protocol.MESSAGE_SIZE + body_size:]
         self.close()
-        print("[Python-NSQ] INFO stop receive thread")
+        self.log("DEBUG", "Stop receive thread")
