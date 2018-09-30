@@ -7,7 +7,7 @@ class Channel:
 
     def read(self):
         self.cond.acquire()
-        if not self.data:
+        if self.data == None:
             self.cond.wait()
         data = self.data
         self.data = None
@@ -17,7 +17,7 @@ class Channel:
 
     def write(self, data):
         self.cond.acquire()
-        if self.data:
+        if self.data != None:
             self.cond.wait()
         self.data = data
         self.cond.notify()

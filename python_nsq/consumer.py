@@ -33,7 +33,7 @@ class Consumer:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if (isinstance(exc_val, Exception)):
-            pass # 报错
+            pass
         self.stop()
 
     def get_status(self):
@@ -227,7 +227,7 @@ class Client: #client for nsqd
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if (isinstance(exc_val, Exception)):
-            pass # 报错
+            pass
         self.stop()
 
     def _router(self, raw):

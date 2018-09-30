@@ -92,7 +92,7 @@ class Conn:
             return "invaild frame type"
         identify_response = json.loads(data)
         self.log("DEBUG", "Identify: " + str(identify_response))
-        if identify_response["tls_v1"]:
+        if self.config.tls_v1:
             err = self._upgrade_tls()
             if err != "":
                 return err
@@ -110,19 +110,28 @@ class Conn:
             tls_config.do_handshake_on_connect, tls_config.suppress_ragged_eofs, tls_config.ciphers)
         except Exception:
             return "\n" + traceback.format_exc(limit=1)
-        return ""
+        raw_response = self._receive_message()
+        if len(raw_response) < protocol.FRAME_TYPE_SIZE:
+            return "receive tls response error"
+        response = protocol.resolve_response(raw_response)
+        frame_type = response[0]
+        data = response[1]
+        if frame_type == protocol.FRAME_TYPE_RESPONSE:
+            if data == b"OK":
+                return ""
+            else:
+                return "receive tls response OK error"
+        elif frame_type == protocol.FRAME_TYPE_ERROR:
+            return bytes_string(data)
+        else:
+            return "invaild frame type"
 
     def _auth(self):
         if len(self.config.auth_secret) == 0:
             return "auth secret can't be NULL"
         err = self.send(command.auth(self.config.auth_secret))
         if err != "":
-            return "send auth message error" + err
-        response = self._receive_message()
-        if len(response) < protocol.FRAME_TYPE_SIZE:
-            return "receive auth message error"
-        if response != b"\x00\x00\x00\x00OK":
-            return "receive auth ok error " + bytes_string(response[protocol.FRAME_TYPE_SIZE:])
+            return "send auth response error" + err
         raw_response = self._receive_message()
         if len(raw_response) < protocol.FRAME_TYPE_SIZE:
             return "receive auth response error"
@@ -130,14 +139,13 @@ class Conn:
         frame_type = response[0]
         data = response[1]
         if frame_type == protocol.FRAME_TYPE_RESPONSE:
-            pass
+            auth_response = json.loads(data)
+            self.log("DEBUG", "Auth: " + str(auth_response))
+            return ""
         elif frame_type == protocol.FRAME_TYPE_ERROR:
             return bytes_string(data)
         else:
             return "invaild frame type"
-        auth_response = json.loads(data)
-        self.log("DEBUG", "Auth: " + str(auth_response))
-        return ""
 
     def send(self, data):
         self.send_mutex.acquire()
@@ -186,7 +194,7 @@ class Conn:
             try:
                 buffer = self.conn.recv(self.buffer_size)
             except Exception:
-                #print(traceback.format_exc(limit=1))
+                print(traceback.format_exc(limit=1))
                 break
             if len(buffer) == 0:
                 break

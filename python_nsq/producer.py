@@ -25,7 +25,7 @@ class Producer:
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if (isinstance(exc_val, Exception)):
-            pass # 报错
+            pass
         self.stop()
 
     def _check_connection(self):
@@ -59,7 +59,7 @@ class Producer:
         self.status_mutex.release()
         local = self.conn.local_address
         remote = self.conn.remote_address[0] + ":" + str(self.conn.remote_address[1])
-        self._log("ERROR", " tcp connection " + local + " -> " + remote + " closed")
+        self._log("ERROR", "tcp connection " + local + " -> " + remote + " closed")
 
     def _on_response(self, response):
         if response == b"OK":
@@ -101,7 +101,7 @@ class Producer:
             self.publish_mutex.release()
             return err    #send error
         response = self.response.read()
-        if response == "":
+        if response == None:
             self.publish_mutex.release()
             return "connection has been closed"
         elif response != "ok": #response = error
@@ -113,23 +113,27 @@ class Producer:
     def multi_publish(self, topic, message):
         assert isinstance(topic, str), "topic is not string"
         assert isinstance(message, list), "message is not list"
+        package = b"" #pack message
+        package += uint32_bytes(len(message))
+        if len(message) == 0:
+            return "message list size is 0"
+        for i in range(0, len(message)): 
+            if not isinstance(message[i], bytes):
+                assert isinstance(message[i], str), "message is not string or bytes"
+            if len(message[i]) == 0:
+                return "message " +str(i)+ " size is 0"
+            package += int32_bytes(len(message[i])) + message[i]
         self.publish_mutex.acquire()
         err = self._check_connection()
         if err != "":
             self.publish_mutex.release()
             return err
-        package = b"" #pack message
-        package += uint32_bytes(len(message))
-        for i in range(0, len(message)):
-            if not isinstance(message[i], bytes):
-                assert isinstance(message[i], str), "message is not string or bytes"
-            package += int32_bytes(len(message[i])) + message[i]
         err = self.conn.send(command.multi_publish(topic, package))
         if err != "":
             self.publish_mutex.release()
             return err    #send error
         response = self.response.read()
-        if response == "":
+        if response == None:
             self.publish_mutex.release()
             return "connection has been closed"
         elif response != "ok": #response = error
@@ -143,6 +147,8 @@ class Producer:
         if not isinstance(message, bytes):
             assert isinstance(message, str), "message is not string or bytes"
         assert isinstance(delay, int), "delay is not int"
+        if len(message) == 0:
+            return "message size is 0"
         self.publish_mutex.acquire()
         err = self._check_connection()
         if err != "":
@@ -153,7 +159,7 @@ class Producer:
             self.publish_mutex.release()
             return err    #send error
         response = self.response.read()
-        if response == "":
+        if response == None:
             self.publish_mutex.release()
             return "connection has been closed"
         elif response != "ok": #response = error
