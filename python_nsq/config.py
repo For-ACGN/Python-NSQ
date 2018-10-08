@@ -70,7 +70,7 @@ class Config:
         assert isinstance(self.dial_timeout, int), "Config.dial_timeout is not int"
         assert isinstance(self.read_timeout, int), "Config.read_timeout is not int"
         assert isinstance(self.write_timeout, int), "Config.write_timeout is not int"
-        
+
     def encode_identify(self): #for identify
         self._validate()
         identify_data = {

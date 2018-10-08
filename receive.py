@@ -8,6 +8,8 @@ def main():
     config.tls_config.ca_certs = "ca.crt"
     config.auth_secret = "python_nsq"
     config.lookupd_poll_interval = 15
+    config.write_timeout = 2
+    config.read_timeout = 2
     consumer = python_nsq.Consumer("test_topic", "test_channel", handler_message, config)
     while True:
         consumer.connect_nsqlookupds(["http://192.168.1.11:4161/"])
@@ -20,14 +22,12 @@ def main():
 
 def handler_message(control, message):
     #control.stop()#control the consumer
-    """
     content = "[message]\n"
     content += "nsqd_address: " + message.nsqd_address + "\n"
     content += "timestamp:    " + str(message.timestamp) + "\n"
     content += "id:           " + str(message.id) + "\n"
     content += "message:      " + str(message.body) + "\n "
     print(content)
-    """
     message.finish()
 
 if __name__ == "__main__":

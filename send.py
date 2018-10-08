@@ -11,6 +11,8 @@ def main():
     producer1 = python_nsq.Producer("192.168.1.11:4150", config1)
     config2 = python_nsq.Config()
     config2.client_id = "Producer2"
+    config2.write_timeout = 2
+    config2.read_timeout = 2
     config2.tls_v1 = True
     config2.tls_config.ca_certs = "ca.crt"
     config2.auth_secret = "python_nsq"
@@ -19,35 +21,35 @@ def main():
         err = producer1.publish("test_topic", b"acg")
         if err != "":
             print(err)
-        #else:
-            #print("producer1 publish successfully")
+        else:
+            print("producer1 publish successfully")
         err = producer2.publish("test_topic", b"acg")
         if err != "":
             print(err)
-        #else:
-            #print("producer2 publish successfully")
+        else:
+            print("producer2 publish successfully")
         err = producer1.multi_publish("test_topic", [b"acg", b"acgn", b"hello"])
         if err != "":
             print(err)
-        #else:
-            #print("producer1 multi publish successfully")
+        else:
+            print("producer1 multi publish successfully")
         err = producer2.multi_publish("test_topic", [b"acg", b"acgn", b"hello"])
         if err != "":
             print(err)
-        #else:
-            #print("producer2 multi publish successfully")
+        else:
+            print("producer2 multi publish successfully")
         err = producer1.deferred_publish("test_topic", b"delay", 5000) #5000ms
         if err != "":
             print(err)
-        #else:
-            #print("producer1 deferred publish successfully")
+        else:
+            print("producer1 deferred publish successfully")
         err = producer2.deferred_publish("test_topic", b"delay", 5000) #5000ms
         if err != "":
             print(err)
-        #else:
-            #print("producer2 deferred publish successfully")
-        #print("----------------------------------")
-        #time.sleep(1)
+        else:
+            print("producer2 deferred publish successfully")
+        print("----------------------------------")
+        time.sleep(1)
     producer.stop()
 
 if __name__ == "__main__":

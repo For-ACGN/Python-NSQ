@@ -59,20 +59,22 @@ class Consumer:
                         " failed\n" + traceback.format_exc(limit=1))
                     continue
                 nodes =  json.loads(response).get("producers","")
-                self.nsqd_tcp_addresses_mutex.acquire()
                 for j in range(0, len(nodes)):
                     ip = nodes[j]["remote_address"].split(":")[0]
                     port = nodes[j]["tcp_port"]
                     nsqd_tcp_address = ip + ":" + str(port)
+                    self.nsqd_tcp_addresses_mutex.acquire()
                     if not nsqd_tcp_address in self.nsqd_tcp_addresses:
                         nsqd = Client(nsqd_tcp_address, self.topic, self.channel, self.config, 
                             self._on_message, self._conn_close, self._log_nsqd)
+                        self.nsqd_tcp_addresses[nsqd_tcp_address] = nsqd
+                        self.nsqd_tcp_addresses_mutex.release()
                         err = nsqd.start()
                         if err != "":     
                             self._log_self("ERROR", "connect nsqd " + nsqd_tcp_address + " " + err)
                             continue
-                        self.nsqd_tcp_addresses[nsqd_tcp_address] = nsqd
-                self.nsqd_tcp_addresses_mutex.release()
+                    else:
+                        self.nsqd_tcp_addresses_mutex.release()
             self.nsqlookupd_http_addresses_mutex.release()
             self._log_self("INFO", "Discovery NSQD finish")
             self.status_mutex.release()
@@ -128,13 +130,12 @@ class Consumer:
             return nsqd_tcp_address + " has been exist"
         nsqd = Client(nsqd_tcp_address, self.topic, self.channel, self.config, 
             self._on_message, self._conn_close, self._log)
-        err = nsqd.start()
-        if err != "":
-            self.nsqd_tcp_addresses_mutex.release()
-            self.status_mutex.release()
-            return err
         self.nsqd_tcp_addresses[nsqd_tcp_address] = nsqd
         self.nsqd_tcp_addresses_mutex.release()
+        err = nsqd.start()
+        if err != "":
+            self.status_mutex.release()
+            return err
         self.status_mutex.release()
         return ""
 
@@ -255,6 +256,9 @@ class Client: #client for nsqd
         id = data[10:26]
         body = data[26:]
         msg = message.Message(self.nsqd_tcp_address, timestamp, attempts, id, body, self.conn.send)
+        if attempts > self.config.max_attempts:
+            msg.finish()
+            return
         self.callback_on_message(msg)
 
     def _on_response(self, response):

@@ -28,15 +28,17 @@ class Producer:
             pass
         self.stop()
 
-    def _check_connection(self):
+    def _check_connection(self): #don't need mutex
         self.status_mutex.acquire()
-        if not self.status:
+        status = self.status
+        self.status_mutex.release()
+        if not status:
             err = self.conn.connect()
             if err != "":
-                self.status_mutex.release()
                 return err
+            self.status_mutex.acquire()
             self.status = 1
-        self.status_mutex.release()    
+            self.status_mutex.release()
         return ""
 
     def _router(self, raw):
@@ -55,8 +57,8 @@ class Producer:
     def _conn_close(self):
         self.status_mutex.acquire()
         self.status = 0
-        self.response.close()
         self.status_mutex.release()
+        self.response.close()
         local = self.conn.local_address
         remote = self.conn.remote_address[0] + ":" + str(self.conn.remote_address[1])
         self._log("ERROR", "tcp connection " + local + " -> " + remote + " closed")
