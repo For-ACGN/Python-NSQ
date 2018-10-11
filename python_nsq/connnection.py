@@ -150,13 +150,13 @@ class Conn:
             return "invaild frame type"
 
     def send(self, data):
-        self.send_mutex.acquire()
         try:
             self.conn.settimeout(self.write_timeout)
+            self.send_mutex.acquire()
             self.conn.sendall(data)#not send()
         except Exception:
-            self.close()
             self.send_mutex.release()
+            self.close()
             return "\n" + traceback.format_exc(limit=1)
         self.send_mutex.release()
         return ""
