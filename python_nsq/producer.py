@@ -1,8 +1,8 @@
 import threading
 
-from python_nsq import connnection
-from python_nsq import command
-from python_nsq import protocol
+from . import connnection
+from . import command
+from . import protocol
 
 from .config import Config
 from .channel import Channel

@@ -4,10 +4,10 @@ import json
 import urllib3
 import time
 
-from python_nsq import connnection
-from python_nsq import command
-from python_nsq import protocol
-from python_nsq import message
+from . import connnection
+from . import command
+from . import protocol
+from . import message
 
 from .config import Config
 from .convert import bytes_uint16

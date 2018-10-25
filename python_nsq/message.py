@@ -1,4 +1,4 @@
-from python_nsq import command
+from . import command
 
 class Message:
     def __init__(self, nsqd_address, timestamp, attempts, id, body, send):

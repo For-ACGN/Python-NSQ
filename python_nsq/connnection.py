@@ -5,8 +5,8 @@ import ssl
 import json
 import traceback
 
-from python_nsq import protocol
-from python_nsq import command
+from . import protocol
+from . import command
 
 from .config import Config
 from .config import TLS_Config
