@@ -263,16 +263,16 @@ class Client: #client for nsqd
 
     def _on_response(self, response):
         if response == b"OK":
-            self._handler_response_ok()
+            self._handle_response_ok()
         elif response == b"_heartbeat_":
-            self._handler_response_heartbeat()
+            self._handle_response_heartbeat()
         else:
             self.callback_log(self.nsqd_tcp_address,"ERROR", "invaild response")
 
-    def _handler_response_ok(self):
+    def _handle_response_ok(self):
         pass
 
-    def _handler_response_heartbeat(self):
+    def _handle_response_heartbeat(self):
         err = self.conn.send(command.nop())
         if err != "":
             self.callback_log(self.nsqd_tcp_address,"ERROR", "send heartbeat response error")

@@ -14,7 +14,7 @@ from .convert import bytes_int32
 from .convert import bytes_string
 
 class Conn:
-    def __init__(self, remote_address, config, handler_message, handler_close, log):
+    def __init__(self, remote_address, config, message_handler, close_handler, log_handler):
         self.remote_address = remote_address
         self.config = config
         self.local_address = ""
@@ -23,9 +23,9 @@ class Conn:
         self.read_message_timeout = config.read_timeout
         self.read_timeout = config.read_timeout + int(config.heartbeat_interval / 1000)
         self.write_timeout = config.write_timeout
-        self.handler_message = handler_message
-        self.handler_close = handler_close
-        self.log = log
+        self.handle_message = message_handler
+        self.handle_close = close_handler
+        self.handle_log = log_handler
         self.conn = None
         self.status = 0  #0=closed 1=connected
         self.status_mutex = threading.Lock()
@@ -46,7 +46,7 @@ class Conn:
         err = self._identify()
         if err != "":
             return err
-        self.log("INFO", "Login successfully")
+        self.handle_log("INFO", "Login successfully")
         self.receive_loop()
         return ""
 
@@ -72,7 +72,7 @@ class Conn:
         if status == 1:
             self.conn.shutdown(2) #close all
             self.conn.close()
-            self.handler_close()
+            self.handle_close()
 
     def _identify(self):
         err = self.send(command.identify(self.config.encode_identify()))
@@ -93,7 +93,7 @@ class Conn:
         else:
             return "invaild frame type"
         identify_response = json.loads(data)
-        self.log("DEBUG", "Identify: " + str(identify_response))
+        self.handle_log("DEBUG", "Identify: " + str(identify_response))
         if self.config.tls_v1:
             err = self._upgrade_tls()
             if err != "":
@@ -142,7 +142,7 @@ class Conn:
         data = response[1]
         if frame_type == protocol.FRAME_TYPE_RESPONSE:
             auth_response = json.loads(data)
-            self.log("DEBUG", "Auth: " + str(auth_response))
+            self.handle_log("DEBUG", "Auth: " + str(auth_response))
             return ""
         elif frame_type == protocol.FRAME_TYPE_ERROR:
             return bytes_string(data)
@@ -186,7 +186,7 @@ class Conn:
         return b""
 
     def receive_loop(self): #start receive loop
-        self.log("DEBUG", "Start receive thread")
+        self.handle_log("DEBUG", "Start receive thread")
         _thread.start_new_thread(self._receive, ())
 
     def _receive(self):
@@ -209,7 +209,7 @@ class Conn:
                 body_size = bytes_int32(data[:protocol.MESSAGE_SIZE])
                 if len(data) < protocol.MESSAGE_SIZE + body_size:
                     break
-                self.handler_message(data[protocol.MESSAGE_SIZE:protocol.MESSAGE_SIZE + body_size])
+                self.handle_message(data[protocol.MESSAGE_SIZE:protocol.MESSAGE_SIZE + body_size])
                 data = data[protocol.MESSAGE_SIZE + body_size:]
         self.close()
-        self.log("DEBUG", "Stop receive thread")
+        self.handle_log("DEBUG", "Stop receive thread")

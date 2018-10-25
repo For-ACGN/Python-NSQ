@@ -17,7 +17,7 @@ class Producer:
         self.nsqd_tcp_address = nsqd_tcp_address
         self.config = config
         addr = nsqd_tcp_address.split(":")
-        self.conn = connnection.Conn((addr[0], int(addr[1])), self.config, self._router, self._conn_close,self._log)
+        self.conn = connnection.Conn((addr[0], int(addr[1])), self.config, self._router, self._conn_close,self._handle_log)
         self.response = Channel()
         self.status = 0 #0=disconnect 1=connect
         self.status_mutex = threading.Lock()
@@ -52,7 +52,7 @@ class Producer:
         elif frame_type == protocol.FRAME_TYPE_MESSAGE:
             pass
         else:
-            self._log("ERROR", "invaild frame type")
+            self._handle_log("ERROR", "invaild frame type")
 
     def _conn_close(self):
         self.status_mutex.acquire()
@@ -61,30 +61,30 @@ class Producer:
         self.response.close()
         local = self.conn.local_address
         remote = self.conn.remote_address[0] + ":" + str(self.conn.remote_address[1])
-        self._log("ERROR", "tcp connection " + local + " -> " + remote + " closed")
+        self._handle_log("ERROR", "tcp connection " + local + " -> " + remote + " closed")
 
     def _on_response(self, response):
         if response == b"OK":
-            self._handler_response_ok()
+            self._handle_response_ok()
         elif response == b"_heartbeat_":
-            self._handler_response_heartbeat()
+            self._handle_response_heartbeat()
         else:
-            self._log("ERROR", "invaild response")
+            self._handle_log("ERROR", "invaild response")
 
-    def _handler_response_ok(self):
+    def _handle_response_ok(self):
         self.response.write("ok")
 
-    def _handler_response_heartbeat(self):
+    def _handle_response_heartbeat(self):
         err = self.conn.send(command.nop())
         if err != "":
-            self._log("ERROR", "send heartbeat response error")
+            self._handle_log("ERROR", "send heartbeat response error")
             return
-        self._log("DEBUG", "send heartbeat response successfully")
+        self._handle_log("DEBUG", "send heartbeat response successfully")
 
     def _on_error(self, err):
         self.response.write(bytes_string(err))
 
-    def _log(self, level, message):#TODO
+    def _handle_log(self, level, message):#TODO
         print("[Python-NSQ] " + level + " Producer " + self.config.client_id + " " + message)
 
     def publish(self, topic, message):
@@ -178,4 +178,4 @@ class Producer:
         self.conn.close()
         self.response.close()
         self.publish_mutex.release()
-        self._log("INFO", "stopped")
+        self._handle_log("INFO", "stopped")
