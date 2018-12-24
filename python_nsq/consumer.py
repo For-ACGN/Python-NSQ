@@ -56,7 +56,7 @@ class Consumer:
                     self.nsqlookupd_http_addresses[i] + "nodes").data.decode("utf-8")
                 except Exception:
                     self._log_self("WARNING", "connect nsqlookupd "+ self.nsqlookupd_http_addresses[i] +
-                        " failed\n" + traceback.format_exc(limit=1))
+                        " failed\n")
                     continue
                 nodes =  json.loads(response).get("producers","")
                 for j in range(0, len(nodes)):

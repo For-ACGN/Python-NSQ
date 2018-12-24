@@ -3,7 +3,6 @@ import threading
 import socket
 import ssl
 import json
-import traceback
 
 from . import protocol
 from . import command
@@ -61,7 +60,7 @@ class Conn:
             self.status = 1
             self.status_mutex.release()
         except Exception:
-            return "\n" + traceback.format_exc(limit=1)
+            return "\n connect error"
         return ""
 
     def close(self):
@@ -70,7 +69,7 @@ class Conn:
         self.status = 0
         self.status_mutex.release()
         if status == 1:
-            self.conn.shutdown(2) #close all
+            #self.conn.shutdown(2) #close all
             self.conn.close()
             self.handle_close()
 
@@ -111,7 +110,7 @@ class Conn:
             tls_config.server_side, tls_config.cert_reqs, tls_config.ssl_version, tls_config.ca_certs, 
             tls_config.do_handshake_on_connect, tls_config.suppress_ragged_eofs, tls_config.ciphers)
         except Exception:
-            return "\n" + traceback.format_exc(limit=1)
+            return "\n upgrade tls error"
         raw_response = self._receive_message()
         if len(raw_response) == 0:
             return "receive tls response error"
@@ -151,13 +150,13 @@ class Conn:
 
     def send(self, data):
         try:
-            self.conn.settimeout(self.write_timeout)
             self.send_mutex.acquire()
+            self.conn.settimeout(self.write_timeout)
             self.conn.sendall(data)#not send()
         except Exception:
             self.send_mutex.release()
             self.close()
-            return "\n" + traceback.format_exc(limit=1)
+            return "\n send error"
         self.send_mutex.release()
         return ""
 
@@ -170,7 +169,6 @@ class Conn:
                 self.conn.settimeout(self.read_message_timeout)
                 buffer = self.conn.recv(self.buffer_size)
             except Exception:
-                traceback.print_exc(limit=1)
                 self.close()
                 break
             if len(buffer) == 0: # !!!!!!! No Exception
@@ -198,7 +196,6 @@ class Conn:
                 self.conn.settimeout(self.read_timeout)
                 buffer = self.conn.recv(self.buffer_size)
             except Exception:
-                print(traceback.format_exc(limit=1))
                 break
             if len(buffer) == 0:
                 break
