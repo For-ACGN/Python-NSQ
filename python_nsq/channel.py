@@ -1,5 +1,6 @@
 import threading
 
+
 class Channel:
     def __init__(self):
         self.data = None
@@ -7,7 +8,7 @@ class Channel:
 
     def read(self):
         self.cond.acquire()
-        if self.data == None:
+        if not self.data:
             self.cond.wait()
         data = self.data
         self.data = None
@@ -17,7 +18,7 @@ class Channel:
 
     def write(self, data):
         self.cond.acquire()
-        if self.data != None:
+        if self.data:
             self.cond.wait()
         self.data = data
         self.cond.notify()

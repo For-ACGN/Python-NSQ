@@ -1,5 +1,6 @@
 from . import command
 
+
 class Message:
     def __init__(self, nsqd_address, timestamp, attempts, id, body, send):
         self.nsqd_address = nsqd_address
@@ -12,7 +13,7 @@ class Message:
     def finish(self):
         self._send(command.finish(self.id))
 
-    def requeue(self, delay): #ms
+    def requeue(self, delay):  # ms
         self._send(command.requeue(self.id, delay))
 
     def touch(self):

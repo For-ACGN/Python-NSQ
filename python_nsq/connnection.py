@@ -7,10 +7,9 @@ import json
 from . import protocol
 from . import command
 
-from .config import Config
-from .config import TLS_Config
 from .convert import bytes_int32
 from .convert import bytes_string
+
 
 class Conn:
     def __init__(self, remote_address, config, message_handler, close_handler, log_handler):
@@ -26,16 +25,16 @@ class Conn:
         self.handle_close = close_handler
         self.handle_log = log_handler
         self.conn = None
-        self.status = 0  #0=closed 1=connected
+        self.status = 0  # 0=closed 1=connected
         self.status_mutex = threading.Lock()
         self.send_mutex = threading.Lock()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if (isinstance(exc_val, Exception)):
+        if isinstance(exc_val, Exception):
             pass
         self.close()
 
-    def connect(self): #need manual connect(lock need)
+    def connect(self):  # need manual connect(lock need)
         err = self._connect()
         if err != "":
             return err
@@ -49,7 +48,7 @@ class Conn:
         self.receive_loop()
         return ""
 
-    def _connect(self): #new socket
+    def _connect(self):  # new socket
         try:
             self.conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.conn.settimeout(self.dial_timeout)
@@ -69,7 +68,7 @@ class Conn:
         self.status = 0
         self.status_mutex.release()
         if status == 1:
-            #self.conn.shutdown(2) #close all
+            # self.conn.shutdown(2) close all
             self.conn.close()
             self.handle_close()
 
@@ -106,9 +105,9 @@ class Conn:
     def _upgrade_tls(self):
         tls_config = self.config.tls_config
         try:
-            self.conn = ssl.wrap_socket(self.conn, tls_config.keyfile, tls_config.certfile, 
-            tls_config.server_side, tls_config.cert_reqs, tls_config.ssl_version, tls_config.ca_certs, 
-            tls_config.do_handshake_on_connect, tls_config.suppress_ragged_eofs, tls_config.ciphers)
+            self.conn = ssl.wrap_socket(self.conn, tls_config.keyfile, tls_config.certfile, tls_config.server_side,
+                                        tls_config.cert_reqs, tls_config.ssl_version, tls_config.ca_certs,
+                                        tls_config.do_handshake_on_connect, tls_config.suppress_ragged_eofs, tls_config.ciphers)
         except Exception:
             return "\n upgrade tls error"
         raw_response = self._receive_message()
@@ -152,7 +151,7 @@ class Conn:
         try:
             self.send_mutex.acquire()
             self.conn.settimeout(self.write_timeout)
-            self.conn.sendall(data)#not send()
+            self.conn.sendall(data)  # not send()
         except Exception:
             self.send_mutex.release()
             self.close()
@@ -160,18 +159,16 @@ class Conn:
         self.send_mutex.release()
         return ""
 
-    def _receive_message(self): #receive one message
-        buffer = b""  #receive buffer
+    def _receive_message(self):  # receive one message
         data = b""
-        body_size = 0
         while True:
             try:
                 self.conn.settimeout(self.read_message_timeout)
-                buffer = self.conn.recv(self.buffer_size)
+                buffer = self.conn.recv(self.buffer_size)  # receive buffer
             except Exception:
                 self.close()
                 break
-            if len(buffer) == 0: # !!!!!!! No Exception
+            if len(buffer) == 0:  # !!!!!!! No Exception
                 self.close()
                 break
             data += buffer
@@ -183,18 +180,16 @@ class Conn:
             return data[protocol.MESSAGE_SIZE:protocol.MESSAGE_SIZE+body_size]
         return b""
 
-    def receive_loop(self): #start receive loop
+    def receive_loop(self):  # start receive loop
         self.handle_log("DEBUG", "Start receive thread")
         _thread.start_new_thread(self._receive, ())
 
     def _receive(self):
-        buffer = b""  #receive buffer
         data = b""
-        body_size = 0
         while True:
             try:
                 self.conn.settimeout(self.read_timeout)
-                buffer = self.conn.recv(self.buffer_size)
+                buffer = self.conn.recv(self.buffer_size)  # receive buffer
             except Exception:
                 break
             if len(buffer) == 0:

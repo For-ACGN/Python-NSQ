@@ -10,25 +10,26 @@ from .convert import int32_bytes
 from .convert import uint32_bytes
 from .convert import bytes_string
 
+
 class Producer:
     def __init__(self, nsqd_tcp_address, config):
-        assert isinstance(nsqd_tcp_address, str) , "nsqd_tcp_address is not string"
-        assert isinstance(config, Config) , "config is not config.Config"
+        assert isinstance(nsqd_tcp_address, str), "nsqd_tcp_address is not string"
+        assert isinstance(config, Config), "config is not config.Config"
         self.nsqd_tcp_address = nsqd_tcp_address
         self.config = config
         addr = nsqd_tcp_address.split(":")
-        self.conn = connnection.Conn((addr[0], int(addr[1])), self.config, self._router, self._conn_close,self._handle_log)
+        self.conn = connnection.Conn((addr[0], int(addr[1])), self.config, self._router, self._conn_close, self._handle_log)
         self.response = Channel()
-        self.status = 0 #0=disconnect 1=connect
+        self.status = 0  # 0=disconnect 1=connect
         self.status_mutex = threading.Lock()
         self.publish_mutex = threading.Lock()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if (isinstance(exc_val, Exception)):
+        if isinstance(exc_val, Exception):
             pass
         self.stop()
 
-    def _check_connection(self): #don't need mutex
+    def _check_connection(self):  # don't need mutex
         self.status_mutex.acquire()
         status = self.status
         self.status_mutex.release()
@@ -84,7 +85,7 @@ class Producer:
     def _on_error(self, err):
         self.response.write(bytes_string(err))
 
-    def _handle_log(self, level, message):#TODO
+    def _handle_log(self, level, message):  # TODO
         print("[Python-NSQ] " + level + " Producer " + self.config.client_id + " " + message)
 
     def publish(self, topic, message):
@@ -98,15 +99,15 @@ class Producer:
         if err != "":
             self.publish_mutex.release()
             return err
-        err =  self.conn.send(command.publish(topic, message))
+        err = self.conn.send(command.publish(topic, message))
         if err != "":
             self.publish_mutex.release()
-            return err    #send error
+            return err  # send error
         response = self.response.read()
-        if response == None:
+        if not response:
             self.publish_mutex.release()
             return "connection has been closed"
-        elif response != "ok": #response = error
+        elif response != "ok":  # response = error
             self.publish_mutex.release()
             return response 
         self.publish_mutex.release()
@@ -115,7 +116,7 @@ class Producer:
     def multi_publish(self, topic, message):
         assert isinstance(topic, str), "topic is not string"
         assert isinstance(message, list), "message is not list"
-        package = b"" #pack message
+        package = b""  # pack message
         package += uint32_bytes(len(message))
         if len(message) == 0:
             return "message list size is 0"
@@ -123,7 +124,7 @@ class Producer:
             if not isinstance(message[i], bytes):
                 assert isinstance(message[i], str), "message is not string or bytes"
             if len(message[i]) == 0:
-                return "message " +str(i)+ " size is 0"
+                return "message " + str(i) + " size is 0"
             package += int32_bytes(len(message[i])) + message[i]
         self.publish_mutex.acquire()
         err = self._check_connection()
@@ -133,18 +134,18 @@ class Producer:
         err = self.conn.send(command.multi_publish(topic, package))
         if err != "":
             self.publish_mutex.release()
-            return err    #send error
+            return err  # send error
         response = self.response.read()
-        if response == None:
+        if not response:
             self.publish_mutex.release()
             return "connection has been closed"
-        elif response != "ok": #response = error
+        elif response != "ok":  # response = error
             self.publish_mutex.release()
             return response 
         self.publish_mutex.release()
         return ""
 
-    def deferred_publish(self, topic, message, delay): #ms
+    def deferred_publish(self, topic, message, delay):  # ms
         assert isinstance(topic, str), "topic is not string"
         if not isinstance(message, bytes):
             assert isinstance(message, str), "message is not string or bytes"
@@ -156,15 +157,15 @@ class Producer:
         if err != "":
             self.publish_mutex.release()
             return err
-        err =  self.conn.send(command.deferred_publish(topic, message, delay))
+        err = self.conn.send(command.deferred_publish(topic, message, delay))
         if err != "":
             self.publish_mutex.release()
-            return err    #send error
+            return err  # send error
         response = self.response.read()
-        if response == None:
+        if not response:
             self.publish_mutex.release()
             return "connection has been closed"
-        elif response != "ok": #response = error
+        elif response != "ok":  # response = error
             self.publish_mutex.release()
             return response 
         self.publish_mutex.release()
