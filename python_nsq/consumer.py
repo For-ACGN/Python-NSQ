@@ -53,13 +53,20 @@ class Consumer:
             for i in range(0, len(self.nsqlookupd_http_addresses)):
                 try:
                     response = self.pool_manager.request("GET",
-                                                         self.nsqlookupd_http_addresses[i] + "nodes").data.decode("utf-8")
+                                                         self.nsqlookupd_http_addresses[i] +
+                                                         "lookup?format=json&topic=" + self.topic
+                                                         ).data.decode("utf-8")
                 except Exception:
                     self._log_self("WARNING", "connect nsqlookupd " + self.nsqlookupd_http_addresses[i] + " failed\n")
                     continue
                 nodes = json.loads(response).get("producers", "")
+                if len(nodes) == 0:
+                    self._log_self("WARNING", "nsqlookupd " +
+                                   self.nsqlookupd_http_addresses[i] +
+                                   "lookup?format=json&topic=" +
+                                   self.topic + " TOPIC_NOT_FOUND\n")
                 for j in range(0, len(nodes)):
-                    ip = nodes[j]["remote_address"].split(":")[0]
+                    ip = nodes[j]["broadcast_address"]
                     port = nodes[j]["tcp_port"]
                     nsqd_tcp_address = ip + ":" + str(port)
                     self.nsqd_tcp_addresses_mutex.acquire()
